@@ -32,6 +32,20 @@ test('summarizes one window', () => {
   ]);
 });
 
+test('averages large finite readings even when their sum would overflow', () => {
+  const max = Number.MAX_VALUE;
+  const readings = [
+    r('a', 1_000, max), r('a', 2_000, max),
+    r('b', 1_000, -max), r('b', 2_000, -max), r('b', 3_000, -max), r('b', 4_000, -max), r('b', 5_000, -max),
+    r('c', 1_000, max), r('c', 2_000, max), r('c', 3_000, -max),
+  ];
+  assert.deepEqual(summarize(readings, { ...config, validRange: { min: -max, max } }), [
+    { deviceId: 'a', windowStart: 0, count: 2, min: max, max, avg: max },
+    { deviceId: 'b', windowStart: 0, count: 5, min: -max, max: -max, avg: -max },
+    { deviceId: 'c', windowStart: 0, count: 3, min: -max, max, avg: max / 3 },
+  ]);
+});
+
 test('a reading at a window boundary starts the next window', () => {
   assert.deepEqual(summarize([r('a', 59_999, 1), r('a', 60_000, 2)], config), [
     { deviceId: 'a', windowStart: 0, count: 1, min: 1, max: 1, avg: 1 },

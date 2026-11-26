@@ -1,7 +1,7 @@
 import { createReadingFilter } from './acceptance.ts';
 import type { Config, Reading, WindowSummary } from './types.ts';
 
-type WindowStats = { count: number; min: number; max: number; sum: number };
+type WindowStats = { count: number; min: number; max: number; sum: number; sumScale: number };
 
 /**
  * Tier 1. Clean `readings` (given in arrival order) and summarize each
@@ -27,16 +27,26 @@ export function summarize(readings: Reading[], config: Config): WindowSummary[] 
       stats.count++;
       stats.min = Math.min(stats.min, value);
       stats.max = Math.max(stats.max, value);
-      stats.sum += value;
+      const nextSum = stats.sum + value / stats.sumScale;
+      if (Number.isFinite(nextSum)) {
+        stats.sum = nextSum;
+      } else {
+        // Double the divisor so each addend is at most half the largest finite number.
+        stats.sumScale *= 2;
+        stats.sum = stats.sum / 2 + value / stats.sumScale;
+      }
     } else {
-      windows.set(windowStart, { count: 1, min: value, max: value, sum: value });
+      windows.set(windowStart, { count: 1, min: value, max: value, sum: value, sumScale: 1 });
     }
   }
 
   const summaries: WindowSummary[] = [];
   for (const [deviceId, windows] of devices) {
-    for (const [windowStart, { count, min, max, sum }] of windows) {
-      summaries.push({ deviceId, windowStart, count, min, max, avg: sum / count });
+    for (const [windowStart, { count, min, max, sum, sumScale }] of windows) {
+      const mean = sum / count;
+      // Rounding during rescaling can put the mean just outside the observed range.
+      const avg = sumScale === 1 ? mean : Math.min(max, Math.max(min, mean * sumScale));
+      summaries.push({ deviceId, windowStart, count, min, max, avg });
     }
   }
   return summaries.sort((a, b) => {
