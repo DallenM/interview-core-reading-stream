@@ -84,6 +84,11 @@ test('drops a resent reading and keeps the first arrival', () => {
   assert.deepEqual(out, [{ deviceId: 'a', windowStart: 0, count: 2, min: 1, max: 3, avg: 2 }]);
 });
 
+test('drops a valid resend when the first arrival was invalid', () => {
+  const out = summarize([r('a', 1_000, null, 7), r('a', 1_000, 50, 7)], config);
+  assert.deepEqual(out, []);
+});
+
 test('the same seq on different devices is not a duplicate', () => {
   const out = summarize([r('a', 1_000, 1, 7), r('b', 1_000, 1, 7)], config);
   assert.equal(out.length, 2);
